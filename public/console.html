@@ -3,54 +3,283 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/icon.ico" />
+
     <meta name="description" content="GDLauncher Console" />
     <style>
+      html {
+        font-family: Inter;
+        scroll-behavior: smooth;
+      }
       body {
         margin: 0;
+        font-family: inter;
       }
       #root {
         width: 100vw;
         height: 100vh;
       }
       #navbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         height: 45px;
         width: 100%;
         background: #050818;
         color: white;
         -webkit-app-region: drag;
       }
+
       #container {
         color: white;
+        position: relative;
+      }
+
+      #scrollArea {
+        margin-top: 40px;
+        height: 100%;
+      }
+
+      #contentArea {
+        margin: 10px;
+        font-size: 14px;
+      }
+
+      #contentArea > div {
+        margin: 10px;
+      }
+
+      .clusterize-scroll {
+        overflow-x: hidden;
+        max-height: calc(100vh - 45px - 40px);
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+        border-radius: 1px;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background-color: #909ea4;
+        border-radius: 3px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background-color: #050818;
+        border-radius: 1px;
+      }
+
+      .clusterize-content {
+        outline: 0;
+      }
+
+      .clusterize-no-data td {
+        text-align: center;
+      }
+
+      #scrollDownButton {
+        position: absolute;
+        bottom: 30px;
+        right: 30px;
+        background-color: #050818;
+        border-radius: 50%;
+        display: block;
+        width: 30px;
+        height: 30px;
+        z-index: 10000;
+      }
+
+      #closeButton {
+        height: 100%;
+        display: flex;
+        width: 45px;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        transition: all 0.1s ease-in-out;
+        -webkit-app-region: no-drag;
+      }
+
+      #closeButton svg {
+        width: 10px;
+      }
+
+      .closeButton:hover {
+        color: #acb9be;
+        background-color: #1b2533;
+      }
+
+      .closeButton:active {
+        color: #acb9be;
+        background-color: #2d3c49;
+      }
+
+      #name {
+        margin-left: 10px;
       }
     </style>
     <title>GDLauncher Console</title>
   </head>
   <body>
     <div id="root">
-      <div id="navbar"></div>
+      <div id="navbar">
+        <div id="name"></div>
+        <div id="closeButton" class="closeButton">
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            data-prefix="fas"
+            data-icon="times"
+            class="svg-inline--fa fa-times fa-w-11"
+            role="img"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 352 512"
+          >
+            <path
+              fill="currentColor"
+              d="M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z"
+            ></path>
+          </svg>
+        </div>
+      </div>
       <div id="container">
-        <ul id="logList"></ul>
+        <div id="scrollDownButton">
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            data-prefix="fas"
+            data-icon="arrow-circle-down"
+            class="svg-inline--fa fa-arrow-circle-down fa-w-16"
+            role="img"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 512 512"
+          >
+            <path
+              fill="currentColor"
+              d="M504 256c0 137-111 248-248 248S8 393 8 256 119 8 256 8s248 111 248 248zm-143.6-28.9L288 302.6V120c0-13.3-10.7-24-24-24h-16c-13.3 0-24 10.7-24 24v182.6l-72.4-75.5c-9.3-9.7-24.8-9.9-34.3-.4l-10.9 11c-9.4 9.4-9.4 24.6 0 33.9L239 404.3c9.4 9.4 24.6 9.4 33.9 0l132.7-132.7c9.4-9.4 9.4-24.6 0-33.9l-10.9-11c-9.5-9.5-25-9.3-34.3.4z"
+            ></path>
+          </svg>
+        </div>
+        <div id="scrollArea" class="clusterize-scroll">
+          <div id="contentArea" class="clusterize-content">
+            <div class="clusterize-no-data">Loading data…</div>
+          </div>
+        </div>
       </div>
     </div>
     <script>
       void (function () {
+        const logs = [];
         const querystring = window.require('querystring');
+        const Clusterize = window.require('clusterize.js');
         const { ipcRenderer } = window.require('electron');
 
-        const { instanceName } = querystring.parse(
+        const { instanceName, pid } = querystring.parse(
           window.global.location.search.slice(1)
         );
-        document.getElementById('navbar').textContent = instanceName;
+
+        document.getElementById('name').innerText = instanceName;
+
+        document
+          .getElementById('closeButton')
+          .addEventListener('click', function () {
+            ipcRenderer.invoke(`closeConsole-${pid}`);
+          });
+
+        const list = new Clusterize({
+          rows: logs,
+          scrollId: 'scrollArea',
+          contentId: 'contentArea'
+        });
+
+        let shouldScroll = true;
+        let lastScrollTop = 0;
 
         ipcRenderer.on('log-data', (e, data) => {
-          const node = document.createElement('li');
-          if (data.foreground) {
-            node.style.color = data.foreground;
-          }
-          const textnode = document.createTextNode(data.text);
-          node.appendChild(textnode);
-          document.getElementById('logList').appendChild(node);
+          let date = new Date();
+          let regex = /\[\D+|\d+\]/;
+
+          const existTimeStamp = regex.test(data.text);
+          const includesMainInfo = data.text.includes('[main/INFO] ');
+          const includesMainWarn = data.text.includes('[main/WARN] ');
+          const includesMainError = data.text.includes('[main/ERROR] ');
+
+          const calcHeader = (inf, warn, err) => {
+            if (inf) {
+              return `<span style="color: #27AE60">[main/INFO]</span>`;
+            } else if (warn) {
+              return `<span style="color: #FAB849">[main/WARN]</span>`;
+            } else if (err) {
+              return `<span style="color: #d62828">[main/ERROR]</span>`;
+            } else return '';
+          };
+
+          let logsWithInfos = `<div>
+                <span style="color: white" >${`[
+              ${date.getHours()}
+              :
+              ${date.getMinutes()}
+              :
+              ${date.getSeconds()}
+              ] `}
+                </span>
+                ${calcHeader(
+                  includesMainInfo,
+                  includesMainWarn,
+                  includesMainError
+                )}
+                  <span style="color: #979CA1">${data.text.replace(
+                    /\[(.+?)\]/g,
+                    ''
+                  )}</span></div>`;
+
+          let logsWithTime = `<div>
+                <span style="color: white">${`[
+              ${date.getHours()}
+              :
+              ${date.getMinutes()}
+              :
+              ${date.getSeconds()}
+              ] `}</span>
+                <span style="color: #979CA1">${data.text}</span>
+                </div>`;
+
+          let ParsedLogs = existTimeStamp ? logsWithInfos : logsWithTime;
+
+          logs.push(ParsedLogs);
+
+          const scrollElem = document.getElementById('contentArea');
+          list.update([...logs, ParsedLogs]);
+          const elem = document.getElementById('scrollArea');
+          if (shouldScroll) elem.scrollTop = elem.scrollHeight;
         });
+
+        const scrollDwButton = document.getElementById('scrollDownButton');
+
+        document
+          .querySelector('#scrollArea')
+          .addEventListener('scroll', function (e) {
+            let isBottom =
+              document.getElementById('scrollArea').scrollTop ===
+              document.getElementById('scrollArea').scrollHeight -
+                document.getElementById('scrollArea').offsetHeight;
+
+            if (isBottom) {
+              scrollDwButton.style.display = 'none';
+              // shouldScroll = true;
+            } else {
+              scrollDwButton.style.display = 'block';
+              shouldScroll = false;
+            }
+            document
+              .getElementById('scrollDownButton')
+              .addEventListener('click', function () {
+                document.getElementById('scrollArea').scrollTop =
+                  document.getElementById('scrollArea').scrollHeight -
+                  document.getElementById('scrollArea').offsetHeight;
+                shouldScroll = true;
+              });
+          });
       })();
     </script>
   </body>
