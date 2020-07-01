@@ -324,15 +324,15 @@ const Instance = ({ instanceName }) => {
             />
             Open Folder
           </MenuItem>
-            <MenuItem onClick={showInstanceConsole}>
-              <FontAwesomeIcon
-                icon={faWrench}
-                css={`
-                  margin-right: 10px;
-                `}
-              />
-              Show Console
-            </MenuItem>
+          <MenuItem onClick={showInstanceConsole}>
+            <FontAwesomeIcon
+              icon={faWrench}
+              css={`
+                margin-right: 10px;
+              `}
+            />
+            Show Console
+          </MenuItem>
 
           {/* // TODO - Support other export options besides curseforge forge. */}
           <MenuItem
