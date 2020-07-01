@@ -80,3 +80,12 @@ export function updateDiscordRPC(val) {
     });
   };
 }
+
+export function updateCurseReleaseChannel(curseReleaseChannel) {
+  return dispatch => {
+    dispatch({
+      type: ActionTypes.UPDATE_CURSE_RELEASE_CHANNEL,
+      curseReleaseChannel
+    });
+  };
+}
