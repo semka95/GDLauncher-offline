@@ -65,11 +65,11 @@ module.exports = merge.smart(baseConfig, {
 
   target: 'electron-main',
 
-  entry: './public/electron.js',
+  entry: `./public/${process.env.FILENAME}`,
 
   output: {
     path: path.join(__dirname, '..'),
-    filename: './build/electron.js'
+    filename: `./build/${process.env.FILENAME}`
   },
 
   optimization: {

@@ -297,17 +297,19 @@ function createConsoleWindow(instanceName, pid, show) {
   );
 
   startedInstances[pid].console.on('close', () => {
-    if (startedInstances[pid]) {
+    if (startedInstances[pid] && startedInstances[pid].console) {
       startedInstances[pid].console = null;
     }
   });
 
+  startedInstances[pid].console.webContents.openDevTools();
+
   startedInstances[pid].console.webContents.once('dom-ready', () => {
-    if (startedInstances[pid].logs) {
-      // eslint-disable-next-line array-callback-return
-      startedInstances[pid].logs.map(v => {
-        startedInstances[pid].console.webContents.send('log-data', v);
-      });
+    if (startedInstances[pid].logs && startedInstances[pid].console) {
+      startedInstances[pid].console.webContents.send(
+        'log-data',
+        startedInstances[pid].logs
+      );
     }
   });
 
@@ -366,7 +368,7 @@ function initializeInstance(
   ps.stderr.on('data', data => {
     const logString = parseAnsi(data.toString());
     startedInstances[ps.pid].logs.push(logString);
-    if (startedInstances[ps.pid]?.console) {
+    if (startedInstances[ps.pid].console) {
       startedInstances[ps.pid].console.webContents.send('log-data', logString);
     }
   });
@@ -402,7 +404,10 @@ ipcMain.handle('fetchStartedInstances', () => {
 });
 
 ipcMain.handle('showInstanceConsole', (e, pid, instanceName) => {
-  if (startedInstances[pid]?.console?.webContents) {
+  if (
+    startedInstances[pid].console &&
+    startedInstances[pid].console.webContents
+  ) {
     startedInstances[pid].console.show();
   } else {
     createConsoleWindow(instanceName, pid, true);
@@ -419,6 +424,7 @@ app.on('window-all-closed', () => {
     watcher.stop();
     watcher = null;
   }
+  console.log('WINDOW ALL CLOSED', Object.keys(startedInstances).length);
   if (
     process.platform !== 'darwin' &&
     Object.keys(startedInstances).length === 0

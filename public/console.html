@@ -5,6 +5,11 @@
     <link rel="icon" href="%PUBLIC_URL%/icon.ico" />
 
     <meta name="description" content="GDLauncher Console" />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="../node_modules/inter-ui/inter.css"
+    />
     <style>
       html {
         font-family: Inter;
@@ -12,7 +17,6 @@
       }
       body {
         margin: 0;
-        font-family: inter;
       }
       #root {
         width: 100vw;
@@ -168,119 +172,7 @@
       </div>
     </div>
     <script>
-      void (function () {
-        const logs = [];
-        const querystring = window.require('querystring');
-        const Clusterize = window.require('clusterize.js');
-        const { ipcRenderer } = window.require('electron');
-
-        const { instanceName, pid } = querystring.parse(
-          window.global.location.search.slice(1)
-        );
-
-        document.getElementById('name').innerText = instanceName;
-
-        document
-          .getElementById('closeButton')
-          .addEventListener('click', function () {
-            ipcRenderer.invoke(`closeConsole-${pid}`);
-          });
-
-        const list = new Clusterize({
-          rows: logs,
-          scrollId: 'scrollArea',
-          contentId: 'contentArea'
-        });
-
-        let shouldScroll = true;
-        let lastScrollTop = 0;
-
-        ipcRenderer.on('log-data', (e, data) => {
-          let date = new Date();
-          let regex = /\[\D+|\d+\]/;
-
-          const existTimeStamp = regex.test(data.text);
-          const includesMainInfo = data.text.includes('[main/INFO] ');
-          const includesMainWarn = data.text.includes('[main/WARN] ');
-          const includesMainError = data.text.includes('[main/ERROR] ');
-
-          const calcHeader = (inf, warn, err) => {
-            if (inf) {
-              return `<span style="color: #27AE60">[main/INFO]</span>`;
-            } else if (warn) {
-              return `<span style="color: #FAB849">[main/WARN]</span>`;
-            } else if (err) {
-              return `<span style="color: #d62828">[main/ERROR]</span>`;
-            } else return '';
-          };
-
-          let logsWithInfos = `<div>
-                <span style="color: white" >${`[
-              ${date.getHours()}
-              :
-              ${date.getMinutes()}
-              :
-              ${date.getSeconds()}
-              ] `}
-                </span>
-                ${calcHeader(
-                  includesMainInfo,
-                  includesMainWarn,
-                  includesMainError
-                )}
-                  <span style="color: #979CA1">${data.text.replace(
-                    /\[(.+?)\]/g,
-                    ''
-                  )}</span></div>`;
-
-          let logsWithTime = `<div>
-                <span style="color: white">${`[
-              ${date.getHours()}
-              :
-              ${date.getMinutes()}
-              :
-              ${date.getSeconds()}
-              ] `}</span>
-                <span style="color: #979CA1">${data.text}</span>
-                </div>`;
-
-          let ParsedLogs = existTimeStamp ? logsWithInfos : logsWithTime;
-
-          logs.push(ParsedLogs);
-
-          const scrollElem = document.getElementById('contentArea');
-          list.update([...logs, ParsedLogs]);
-          const elem = document.getElementById('scrollArea');
-          if (shouldScroll) elem.scrollTop = elem.scrollHeight;
-        });
-
-        const scrollDwButton = document.getElementById('scrollDownButton');
-
-        document
-          .querySelector('#scrollArea')
-          .addEventListener('scroll', function (e) {
-            let isBottom =
-              document.getElementById('scrollArea').scrollTop ===
-              document.getElementById('scrollArea').scrollHeight -
-                document.getElementById('scrollArea').offsetHeight;
-
-            if (isBottom) {
-              scrollDwButton.style.display = 'none';
-              // shouldScroll = true;
-            } else {
-              scrollDwButton.style.display = 'block';
-              shouldScroll = false;
-            }
-            document
-              .getElementById('scrollDownButton')
-              .addEventListener('click', function () {
-                document.getElementById('scrollArea').scrollTop =
-                  document.getElementById('scrollArea').scrollHeight -
-                  document.getElementById('scrollArea').offsetHeight;
-                shouldScroll = true;
-              });
-          });
-      })();
+      require('./console.js');
     </script>
   </body>
 </html>
