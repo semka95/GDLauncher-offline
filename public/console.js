@@ -1,5 +1,6 @@
-import querystring from 'querystring';
-import Clusterize from 'clusterize.js';
+const req = process.env.NODE_ENV === 'production' ? require : window.require;
+const querystring = req('querystring');
+const Clusterize = req('clusterize.js');
 
 (() => {
   const { ipcRenderer } = window.require('electron');

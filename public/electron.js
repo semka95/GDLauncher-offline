@@ -358,18 +358,28 @@ function initializeInstance(
   }, 60 * 1000);
 
   ps.stdout.on('data', data => {
-    const logString = parseAnsi(data.toString())[0];
-    startedInstances[ps.pid].logs.push(logString);
-    if (startedInstances[ps.pid].console) {
-      startedInstances[ps.pid].console.webContents.send('log-data', logString);
+    if (startedInstances[ps.pid]) {
+      const logString = parseAnsi(data.toString())[0];
+      startedInstances[ps.pid].logs.push(logString);
+      if (startedInstances[ps.pid].console) {
+        startedInstances[ps.pid].console.webContents.send(
+          'log-data',
+          logString
+        );
+      }
     }
   });
 
   ps.stderr.on('data', data => {
-    const logString = parseAnsi(data.toString());
-    startedInstances[ps.pid].logs.push(logString);
-    if (startedInstances[ps.pid].console) {
-      startedInstances[ps.pid].console.webContents.send('log-data', logString);
+    if (startedInstances[ps.pid]) {
+      const logString = parseAnsi(data.toString());
+      startedInstances[ps.pid].logs.push(logString);
+      if (startedInstances[ps.pid].console) {
+        startedInstances[ps.pid].console.webContents.send(
+          'log-data',
+          logString
+        );
+      }
     }
   });
 
@@ -424,7 +434,6 @@ app.on('window-all-closed', () => {
     watcher.stop();
     watcher = null;
   }
-  console.log('WINDOW ALL CLOSED', Object.keys(startedInstances).length);
   if (
     process.platform !== 'darwin' &&
     Object.keys(startedInstances).length === 0
@@ -494,6 +503,13 @@ ipcMain.handle('show-window', () => {
 });
 
 ipcMain.handle('quit-app', () => {
+  Object.keys(startedInstances).forEach(k => {
+    if (startedInstances[k].console) {
+      startedInstances[k].console.close();
+      startedInstances[k] = null;
+    }
+  });
+  startedInstances = {};
   mainWindow.close();
   mainWindow = null;
 });
