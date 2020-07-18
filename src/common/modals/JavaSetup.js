@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Button, Progress, Input } from 'antd';
 import { Transition } from 'react-transition-group';
 import styled from 'styled-components';
@@ -332,7 +332,7 @@ const AutomaticSetup = () => {
   );
 };
 
-export default JavaSetup;
+export default memo(JavaSetup);
 
 const FirstStep = styled.div`
   transition: 0.2s ease-in-out;

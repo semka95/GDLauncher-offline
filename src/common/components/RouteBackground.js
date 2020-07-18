@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 const RouteBackground = () => {
   return (
@@ -14,4 +14,4 @@ const RouteBackground = () => {
   );
 };
 
-export default RouteBackground;
+export default memo(RouteBackground);

@@ -71,7 +71,7 @@ function DesktopRoot({ store }) {
   const init = async () => {
     const startedInstances = await ipcRenderer.invoke('fetchStartedInstances');
     Object.entries(startedInstances).map(([k, v]) => {
-      if (v) {
+      if (v?.started) {
         dispatch(
           addStartedInstance({
             instanceName: v.instanceName,

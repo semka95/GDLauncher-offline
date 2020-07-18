@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import fse from 'fs-extra';
 import path from 'path';
 import { Button } from 'antd';
@@ -76,4 +76,4 @@ const InstanceDeleteConfirmation = ({ instanceName }) => {
   );
 };
 
-export default InstanceDeleteConfirmation;
+export default memo(InstanceDeleteConfirmation);

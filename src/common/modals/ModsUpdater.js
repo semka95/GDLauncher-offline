@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, memo } from 'react';
 import styled from 'styled-components';
 import { useDispatch, useSelector } from 'react-redux';
 import { Progress } from 'antd';
@@ -81,7 +81,7 @@ const ModsUpdater = ({ instanceName }) => {
   );
 };
 
-export default ModsUpdater;
+export default memo(ModsUpdater);
 
 const Container = styled.div`
   width: 100%;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef, useContext, memo } from 'react';
 import ContentLoader from 'react-content-loader';
 import styled, { ThemeContext } from 'styled-components';
 import { shell } from 'electron';
@@ -229,4 +229,4 @@ function News({ style, news }) {
   );
 }
 
-export default News;
+export default memo(News);

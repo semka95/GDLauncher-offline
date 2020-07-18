@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import path from 'path';
 import styled from 'styled-components';
 import Modal from '../components/Modal';
@@ -16,7 +16,7 @@ const Img = styled.img`
   height: 100%;
 `;
 
-export default function Screenshot({ screenshotsPath, file }) {
+const Screenshot = ({ screenshotsPath, file }) => {
   const image = `file:///${path.join(screenshotsPath, file.name)}`;
 
   return (
@@ -34,4 +34,6 @@ export default function Screenshot({ screenshotsPath, file }) {
       </Container>
     </Modal>
   );
-}
+};
+
+export default memo(Screenshot);

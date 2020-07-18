@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import styled from 'styled-components';
 import { Spin, message } from 'antd';
 import { useSelector, useDispatch } from 'react-redux';
@@ -136,7 +136,7 @@ const ProfileSettings = () => {
   );
 };
 
-export default ProfileSettings;
+export default memo(ProfileSettings);
 
 const Container = styled.div`
   width: 100%;

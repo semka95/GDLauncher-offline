@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import styled from 'styled-components';
 
 const Options = styled.div`
@@ -19,4 +19,4 @@ const Overview = () => {
   );
 };
 
-export default Overview;
+export default memo(Overview);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import styled from 'styled-components';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faWindowClose } from '@fortawesome/free-solid-svg-icons';
@@ -12,7 +12,7 @@ const CloseButton = props => {
   );
 };
 
-export default CloseButton;
+export default memo(CloseButton);
 
 const CloseIcon = styled.div`
   font-size: 20px;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy } from 'react';
+import React, { useState, useEffect, lazy, memo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import styled from 'styled-components';
 import { closeModal } from '../reducers/modals/actions';
@@ -172,4 +172,4 @@ const ModalsManager = () => {
   return renderedModals;
 };
 
-export default ModalsManager;
+export default memo(ModalsManager);

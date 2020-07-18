@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import styled from 'styled-components';
 import { useDispatch } from 'react-redux';
 import { Input, Button } from 'antd';
@@ -59,7 +59,7 @@ const AddAccount = ({ username }) => {
   );
 };
 
-export default AddAccount;
+export default memo(AddAccount);
 
 const StyledInput = styled(Input)`
   margin-bottom: 20px;

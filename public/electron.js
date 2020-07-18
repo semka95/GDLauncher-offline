@@ -20,7 +20,6 @@ const fss = require('fs');
 const { promisify } = require('util');
 const querystring = require('querystring');
 const fse = require('fs-extra');
-const { omit } = require('lodash');
 const { parseAnsi } = require('ansi-color-parse');
 
 const fs = fss.promises;
@@ -146,7 +145,7 @@ extract7z();
 let mainWindow;
 let watcher;
 let tray;
-let startedInstances = {};
+const startedInstances = {};
 
 function createTrayIcon() {
   const RESOURCE_DIR = isDev ? __dirname : path.join(__dirname, '../build');
@@ -299,6 +298,9 @@ function createConsoleWindow(instanceName, pid, show) {
   startedInstances[pid].console.on('close', () => {
     if (startedInstances[pid] && startedInstances[pid].console) {
       startedInstances[pid].console = null;
+      if (!startedInstances[pid].started) {
+        startedInstances[pid] = null;
+      }
     }
   });
 
@@ -315,7 +317,6 @@ function createConsoleWindow(instanceName, pid, show) {
 
   ipcMain.handleOnce(`closeConsole-${pid}`, () => {
     startedInstances[pid].console.close();
-    startedInstances[pid].console = null;
   });
 }
 
@@ -331,7 +332,13 @@ function initializeInstance(
     cwd: path.join(instancesPath, instanceName),
     shell: true
   });
-  startedInstances[ps.pid] = { instanceName, playedTime: 0, logs: [] };
+  startedInstances[ps.pid] = {
+    instanceName,
+    playedTime: 0,
+    logs: [],
+    closeCode: null,
+    started: true
+  };
 
   const playTimer = setInterval(async () => {
     if (!mainWindow) {
@@ -383,10 +390,10 @@ function initializeInstance(
     }
   });
 
-  ps.on('close', () => {
+  ps.on('close', code => {
     clearInterval(playTimer);
-    startedInstances = omit(startedInstances, [ps.pid]);
-    startedInstances[ps.pid] = null;
+    startedInstances[ps.pid].started = false;
+    startedInstances[ps.pid].closeCode = code;
     if (!ps.killed) {
       ps.kill();
     }
@@ -400,6 +407,17 @@ function initializeInstance(
       mainWindow = createWindow(startedInstances);
       mainWindow.show();
       mainWindow.focus();
+    }
+
+    if (code !== 0) {
+      if (
+        startedInstances[ps.pid].console &&
+        startedInstances[ps.pid].console.webContents
+      ) {
+        startedInstances[ps.pid].console.show();
+      } else {
+        createConsoleWindow(instanceName, ps.pid, true);
+      }
     }
   });
   return ps;
@@ -436,7 +454,7 @@ app.on('window-all-closed', () => {
   }
   if (
     process.platform !== 'darwin' &&
-    Object.keys(startedInstances).length === 0
+    Object.values(startedInstances).filter(v => v.started).length === 0
   ) {
     app.quit();
   }
@@ -472,10 +490,6 @@ ipcMain.handle('update-progress-bar', (event, p) => {
 ipcMain.handle('hide-window', () => {
   if (mainWindow) {
     mainWindow.hide();
-    setTimeout(() => {
-      mainWindow.close();
-      mainWindow = null;
-    }, 1000);
   }
 });
 
@@ -503,15 +517,10 @@ ipcMain.handle('show-window', () => {
 });
 
 ipcMain.handle('quit-app', () => {
-  Object.keys(startedInstances).forEach(k => {
-    if (startedInstances[k].console) {
-      startedInstances[k].console.close();
-      startedInstances[k] = null;
-    }
-  });
-  startedInstances = {};
-  mainWindow.close();
-  mainWindow = null;
+  if (mainWindow) {
+    mainWindow.close();
+    mainWindow = null;
+  }
 });
 
 ipcMain.handle('isAppImage', () => {
