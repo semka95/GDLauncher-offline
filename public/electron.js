@@ -454,7 +454,7 @@ app.on('window-all-closed', () => {
   }
   if (
     process.platform !== 'darwin' &&
-    Object.values(startedInstances).filter(v => v.started).length === 0
+    Object.values(startedInstances).filter(v => v?.started).length === 0
   ) {
     app.quit();
   }
@@ -518,8 +518,12 @@ ipcMain.handle('show-window', () => {
 
 ipcMain.handle('quit-app', () => {
   if (mainWindow) {
-    mainWindow.close();
-    mainWindow = null;
+    if (Object.values(startedInstances).filter(v => v?.started).length === 0) {
+      mainWindow.close();
+      mainWindow = null;
+    } else {
+      mainWindow.hide();
+    }
   }
 });
 
