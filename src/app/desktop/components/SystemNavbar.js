@@ -24,11 +24,13 @@ import Logo from '../../../ui/Logo';
 const SystemNavbar = () => {
   const dispatch = useDispatch();
   const [isMaximized, setIsMaximized] = useState(false);
-  const isUpdateAvailable = useSelector(state => state.updateAvailable);
+  const isUpdateAvailable = false;
   const location = useSelector(state => state.router.location.pathname);
   const [isAppImage, setIsAppImage] = useState(false);
 
   const modals = useSelector(state => state.modals);
+
+  const hideAds = useSelector(state => state.settings.hideAds);
 
   const areSettingsOpen = modals.find(
     v => v.modalType === 'Settings' && !v.unmounting
@@ -275,19 +277,21 @@ const SystemNavbar = () => {
       </Container>
       {isOsx && (
         <>
-          <div
-            css={`
-              display: flex;
-              height: 100%;
-            `}
-          >
-            Partnered with &nbsp;&nbsp;
-            <BisectHosting
-              showPointerCursor
-              onClick={() => dispatch(openModal('BisectHosting'))}
-            />
-            {/* <PulsatingCircle /> */}
-          </div>
+          {!hideAds && (
+            <div
+              css={`
+                display: flex;
+                height: 100%;
+              `}
+            >
+              Partnered with &nbsp;&nbsp;
+              <BisectHosting
+                showPointerCursor
+                onClick={() => dispatch(openModal('BisectHosting'))}
+              />
+              {/* <PulsatingCircle /> */}
+            </div>
+          )}
           <div>
             <DevtoolButton />
             <a
