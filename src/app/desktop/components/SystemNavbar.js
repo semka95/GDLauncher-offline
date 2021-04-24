@@ -182,25 +182,27 @@ const SystemNavbar = () => {
             </a>
             <DevtoolButton />
           </div>
-          <div
-            css={`
-              display: flex;
-              height: 100%;
-            `}
-          >
+          {!hideAds && (
             <div
               css={`
-                white-space: nowrap;
+                display: flex;
+                height: 100%;
               `}
             >
-              Partnered with &nbsp;&nbsp;
+              <div
+                css={`
+                  white-space: nowrap;
+                `}
+              >
+                Partnered with &nbsp;&nbsp;
+              </div>
+              <BisectHosting
+                showPointerCursor
+                onClick={() => dispatch(openModal('BisectHosting'))}
+              />
+              {/* <PulsatingCircle /> */}
             </div>
-            <BisectHosting
-              showPointerCursor
-              onClick={() => dispatch(openModal('BisectHosting'))}
-            />
-            {/* <PulsatingCircle /> */}
-          </div>
+          )}
         </>
       )}
       <Container os={isOsx}>
