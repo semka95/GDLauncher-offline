@@ -6,8 +6,10 @@ const path = require('path');
 // eslint-disable-next-line
 const webpack = require('webpack');
 const { merge } = require('webpack-merge');
+const os = require('os');
 const TerserPlugin = require('terser-webpack-plugin');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 const baseConfig = {
   externals: [],
@@ -18,7 +20,8 @@ const baseConfig = {
         test: /\.node$/,
         loader: 'native-ext-loader',
         options: {
-          basePath: []
+          basePath: ['native', os.platform()],
+          emit: false
         }
       },
       {
@@ -57,6 +60,9 @@ const baseConfig = {
     new webpack.EnvironmentPlugin({
       NODE_ENV: process.env.NODE_ENV,
       REACT_APP_RELEASE_TYPE: process.env.REACT_APP_RELEASE_TYPE
+    }),
+    new CopyWebpackPlugin({
+      patterns: [{ from: './public/native', to: './build/native' }]
     }),
 
     new webpack.NamedModulesPlugin()
