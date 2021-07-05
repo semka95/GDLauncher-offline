@@ -23,7 +23,7 @@ const ChangeLogs = () => {
       title={`What's new in ${version}`}
     >
       <Container>
-        <Section>
+        {/* <Section>
           <SectionTitle
             css={`
               color: ${props => props.theme.palette.colors.green};
@@ -33,17 +33,15 @@ const ChangeLogs = () => {
           </SectionTitle>
           <div>
             <ul>
-              <li>Added FTB support.</li>
-              <li>Added Microsoft accounts support.</li>
-              <li>Added confirmation modal when deleting all shared data.</li>
-              <li>Added a per-instance java path setting.</li>
               <li>
-                Added a progress state in the taskbar icon when downloading an
-                instance.
+                Automatically set recommended/minimum RAM amount for FTB
+                modpacks, and eventually show a confirmation modal in case the
+                user has not enough.
               </li>
+              <li>Added modlist.html when exporting instances.</li>
             </ul>
           </div>
-        </Section>
+        </Section> */}
         <Section>
           <SectionTitle
             css={`
@@ -54,12 +52,7 @@ const ChangeLogs = () => {
           </SectionTitle>
           <div>
             <ul>
-              <li>Fixed copy/paste on macOS.</li>
-              <li>Fixed crash when browsing curseforge modpacks.</li>
-              <li>Fixed duplicated news.</li>
-              <li>Fixed avatar images sometimes now showing correctly.</li>
-              <li>Fixed auto updates on portable-win.</li>
-              <li>Fixed crash when adding a new instance.</li>
+              <li>Various QoL fixes.</li>
             </ul>
           </div>
         </Section>
@@ -77,13 +70,11 @@ const ChangeLogs = () => {
           </p>
           <Button
             css={`
-              width: 200px;
-              height: 40px;
               font-size: 20px;
-              padding: 4px !important;
               margin-top: 20px;
             `}
             type="primary"
+            size="large"
             href="https://discord.gg/4cGYzen"
           >
             <FontAwesomeIcon icon={faDiscord} />

@@ -397,6 +397,7 @@ const General = () => {
               );
             }}
             value={releaseChannel}
+            virtual={false}
           >
             <Select.Option value={0}>Stable</Select.Option>
             <Select.Option value={1}>Beta</Select.Option>
@@ -425,6 +426,7 @@ const General = () => {
             width: 100px;
             text-align: start;
           `}
+          virtual={false}
         >
           {[...Array(20).keys()]
             .map(x => x + 1)
@@ -456,6 +458,7 @@ const General = () => {
           `}
           onChange={e => dispatch(updateCurseReleaseChannel(e))}
           value={curseReleaseChannel}
+          virtual={false}
         >
           <Select.Option value={1}>Stable</Select.Option>
           <Select.Option value={2}>Beta</Select.Option>
