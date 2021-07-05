@@ -36,7 +36,7 @@ const Home = () => {
   const forthSlideRef = useRef(null);
   const fifthSlideRef = useRef(null);
   const executeScroll = type => {
-    if (currentSlide + type < 0 || currentSlide + type > 5) return;
+    if (currentSlide + type < 0 || currentSlide + type > 3) return;
     setCurrentSlide(currentSlide + type);
     switch (currentSlide + type) {
       case 0:

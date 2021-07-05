@@ -644,15 +644,15 @@ if (process.env.REACT_APP_RELEASE_TYPE === 'setup') {
   });
 
   autoUpdater.on('update-available', () => {
-    autoUpdater.downloadUpdate();
+    // autoUpdater.downloadUpdate();
   });
 
   autoUpdater.on('update-downloaded', () => {
-    mainWindow.webContents.send('updateAvailable');
+    // mainWindow.webContents.send('updateAvailable');
   });
 
   ipcMain.handle('checkForUpdates', () => {
-    autoUpdater.checkForUpdates();
+    // autoUpdater.checkForUpdates();
   });
 }
 

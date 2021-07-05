@@ -178,7 +178,6 @@ const SystemNavbar = () => {
                 -webkit-app-region: no-drag;
               `}
             >
-              <Logo size={35} pointerCursor />
             </a>
             <DevtoolButton />
           </div>
@@ -303,7 +302,6 @@ const SystemNavbar = () => {
                 -webkit-app-region: no-drag;
               `}
             >
-              <Logo size={35} pointerCursor />
             </a>
           </div>
         </>
