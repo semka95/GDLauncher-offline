@@ -16,10 +16,11 @@ import { openModal } from '../../../common/reducers/modals/actions';
 import {
   checkForPortableUpdates,
   updateUpdateAvailable,
-  getAppLatestVersion
+  isNewVersionAvailable
 } from '../../../common/reducers/actions';
 import BisectHosting from '../../../ui/BisectHosting';
 import Logo from '../../../ui/Logo';
+import ga from '../../../common/utils/analytics';
 
 const SystemNavbar = () => {
   const dispatch = useDispatch();
@@ -55,7 +56,7 @@ const SystemNavbar = () => {
         .then(v => dispatch(updateUpdateAvailable(Boolean(v))))
         .catch(console.error);
     } else {
-      dispatch(getAppLatestVersion())
+      isNewVersionAvailable()
         .then(v => dispatch(updateUpdateAvailable(Boolean(v))))
         .catch(console.error);
     }
@@ -175,6 +176,7 @@ const SystemNavbar = () => {
               rel="noopener noreferrer"
               css={`
                 margin-top: 5px;
+                margin-right: 5px;
                 -webkit-app-region: no-drag;
               `}
             >
@@ -299,6 +301,7 @@ const SystemNavbar = () => {
               rel="noopener noreferrer"
               css={`
                 margin-top: 5px;
+                margin-right: 5px;
                 -webkit-app-region: no-drag;
               `}
             >

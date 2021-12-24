@@ -74,6 +74,15 @@ function javaManifest(state = {}, action) {
   }
 }
 
+function javaLatestManifest(state = {}, action) {
+  switch (action.type) {
+    case ActionTypes.UPDATE_JAVA_LATEST_MANIFEST:
+      return action.data;
+    default:
+      return state;
+  }
+}
+
 function clientToken(state = null, action) {
   switch (action.type) {
     case ActionTypes.UPDATE_CLIENT_TOKEN:
@@ -108,6 +117,7 @@ export default combineReducers({
   forgeManifest,
   fabricManifest,
   javaManifest,
+  javaLatestManifest,
   curseforgeCategories,
   clientToken,
   isNewUser,

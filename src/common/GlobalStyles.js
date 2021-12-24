@@ -90,7 +90,7 @@ export default createGlobalStyle`
     border-radius: 4px;
     color: ${props => props.theme.palette.text.primary};
     font-size: 16px;
-    min-width: 180px;
+    min-width: 220px;
     outline: none;
     transform-origin: top left;
     pointer-events: none;
@@ -105,7 +105,7 @@ export default createGlobalStyle`
     transition: opacity 150ms;
     opacity: 1;
     pointer-events: auto;
-    z-index: 9999;
+    z-index: 999999;
   }
   
   .react-contextmenu-item {
@@ -150,11 +150,16 @@ export default createGlobalStyle`
     padding: 2px 0;
   }
 
+  .ant-select-dropdown, .ant-dropdown, .ant-cascader-menus {
+    z-index: 99999999 !important;
+  }
+
 
   @keyframes modalShake {
     0% { transform: scale(1.01) }
     30% { transform: scale(0.99) }
     60% { transform: scale(1.01) }
-    90% { transform: scale(0.99)}
-    100% {transform: scale(1) }
+    90% { transform: scale(0.99) }
+    100% { transform: scale(1) }
+  }
 `;

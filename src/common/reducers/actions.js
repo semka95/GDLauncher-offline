@@ -12,10 +12,11 @@ import gt from 'semver/functions/gt';
 import log from 'electron-log';
 import omitBy from 'lodash/omitBy';
 import { pipeline } from 'stream';
+import he from 'he';
 import zlib from 'zlib';
 import lockfile from 'lockfile';
 import omit from 'lodash/omit';
-import Seven, { extractFull } from 'node-7z';
+import Seven from 'node-7z';
 import { push } from 'connected-react-router';
 import { spawn } from 'child_process';
 import symlink from 'symlink-dir';
@@ -23,96 +24,102 @@ import fss, { promises as fs } from 'fs';
 import originalFs from 'original-fs';
 import pMap from 'p-map';
 import makeDir from 'make-dir';
-import { parse } from 'semver';
+import { major, minor, patch, prerelease } from 'semver';
 import { generate as generateRandomString } from 'randomstring';
 import fxp from 'fast-xml-parser';
 import * as ActionTypes from './actionTypes';
 import {
-  NEWS_URL,
-  MC_RESOURCES_URL,
-  GDL_LEGACYJAVAFIXER_MOD_URL,
-  FORGE,
-  FMLLIBS_OUR_BASE_URL,
-  FMLLIBS_FORGE_BASE_URL,
-  MICROSOFT_OAUTH_CLIENT_ID,
-  MICROSOFT_OAUTH_REDIRECT_URL,
   ACCOUNT_MICROSOFT,
   ACCOUNT_MOJANG,
-  FTB,
+  CURSEFORGE,
   FABRIC,
-  CURSEFORGE
+  FMLLIBS_FORGE_BASE_URL,
+  FMLLIBS_OUR_BASE_URL,
+  FORGE,
+  FTB,
+  GDL_LEGACYJAVAFIXER_MOD_URL,
+  LATEST_JAVA_VERSION,
+  MC_RESOURCES_URL,
+  MC_STARTUP_METHODS,
+  MICROSOFT_OAUTH_CLIENT_ID,
+  MICROSOFT_OAUTH_REDIRECT_URL,
+  NEWS_URL
 } from '../utils/constants';
 import {
-  mcAuthenticate,
-  mcRefresh,
-  mcInvalidate,
-  getFabricManifest,
-  getMcManifest,
-  getForgeManifest,
-  mcValidate,
-  getFabricJson,
-  getAddonFile,
-  getJavaManifest,
-  getAddonsByFingerprint,
-  getAddonFiles,
   getAddon,
-  // getFTBModpackData,
-  getFTBModpackVersionData,
   getAddonCategories,
-  msAuthenticateXBL,
-  msExchangeCodeForAccessToken,
-  msAuthenticateXSTS,
+  getAddonFile,
+  getAddonFiles,
+  getAddonsByFingerprint,
+  getFabricJson,
+  getFabricManifest,
+  getForgeManifest,
+  getFTBModpackVersionData,
+  getJavaLatestManifest,
+  getJavaManifest,
+  getMcManifest,
+  getMultipleAddons,
+  mcAuthenticate,
+  mcInvalidate,
+  mcRefresh,
+  mcValidate,
   msAuthenticateMinecraft,
+  msAuthenticateXBL,
+  msAuthenticateXSTS,
+  msExchangeCodeForAccessToken,
   msMinecraftProfile,
   msOAuthRefresh
 } from '../api';
 import {
+  _getAccounts,
+  _getAssetsPath,
   _getCurrentAccount,
   _getCurrentDownloadItem,
-  _getJavaPath,
-  _getMinecraftVersionsPath,
-  _getAssetsPath,
-  _getInstancesPath,
-  _getLibrariesPath,
-  _getAccounts,
-  _getTempPath,
+  _getDataStorePath,
   _getInstance,
-  _getDataStorePath
+  _getInstancesPath,
+  _getJavaPath,
+  _getLibrariesPath,
+  _getMinecraftVersionsPath,
+  _getTempPath
 } from '../utils/selectors';
 import {
-  librariesMapper,
-  get7zPath,
-  extractNatives,
-  getJVMArguments112,
-  copyAssetsToResources,
-  getJVMArguments113,
-  patchForge113,
-  mavenToArray,
+  convertCompletePathToInstance,
+  convertcurseForgeToCanonical,
   copyAssetsToLegacy,
-  getPlayerSkin,
-  normalizeModData,
-  reflect,
-  isMod,
-  isInstanceFolderPath,
+  copyAssetsToResources,
+  downloadAddonZip,
+  extractAll,
+  extractFabricVersionFromManifest,
+  extractNatives,
+  filterFabricFilesByVersion,
+  filterForgeFilesByVersion,
+  get7zPath,
   getFileHash,
   getFilesRecursive,
-  filterForgeFilesByVersion,
-  filterFabricFilesByVersion,
+  getJVMArguments112,
+  getJVMArguments113,
   getPatchedInstanceType,
-  convertCompletePathToInstance,
-  downloadAddonZip,
-  convertcurseForgeToCanonical
+  getPlayerSkin,
+  isInstanceFolderPath,
+  isMod,
+  librariesMapper,
+  mavenToArray,
+  normalizeModData,
+  patchForge113,
+  reflect
 } from '../../app/desktop/utils';
+import ga from '../utils/analytics';
 import {
   downloadFile,
   downloadInstanceFiles
 } from '../../app/desktop/utils/downloader';
-import { removeDuplicates, getFileMurmurHash2 } from '../utils';
+import { getFileMurmurHash2, removeDuplicates } from '../utils';
 import { UPDATE_CONCURRENT_DOWNLOADS } from './settings/actionTypes';
 import { UPDATE_MODAL } from './modals/actionTypes';
 import PromiseQueue from '../../app/desktop/utils/PromiseQueue';
 import fmlLibsMapping from '../../app/desktop/utils/fmllibs';
-import { openModal } from './modals/actions';
+import { openModal, closeModal } from './modals/actions';
 import forgePatcher from '../utils/forgePatcher';
 
 export function initManifests() {
@@ -141,6 +148,14 @@ export function initManifests() {
       const java = (await getJavaManifest()).data;
       dispatch({
         type: ActionTypes.UPDATE_JAVA_MANIFEST,
+        data: java
+      });
+      return java;
+    };
+    const getJavaLatestManifestVersions = async () => {
+      const java = (await getJavaLatestManifest()).data;
+      dispatch({
+        type: ActionTypes.UPDATE_JAVA_LATEST_MANIFEST,
         data: java
       });
       return java;
@@ -175,9 +190,10 @@ export function initManifests() {
       return omitBy(forgeVersions, v => v.length === 0);
     };
     // Using reflect to avoid rejection
-    const [fabric, java, categories, forge] = await Promise.all([
+    const [fabric, java, javaLatest, categories, forge] = await Promise.all([
       reflect(getFabricVersions()),
       reflect(getJavaManifestVersions()),
+      reflect(getJavaLatestManifestVersions()),
       reflect(getAddonCategoriesVersions()),
       reflect(getForgeVersions())
     ]);
@@ -190,6 +206,7 @@ export function initManifests() {
       mc: mc || app.vanillaManifest,
       fabric: fabric.status ? fabric.v : app.fabricManifest,
       java: java.status ? java.v : app.javaManifest,
+      javaLatest: javaLatest.status ? javaLatest.v : app.javaLatestManifest,
       categories: categories.status ? categories.v : app.curseforgeCategories,
       forge: forge.status ? forge.v : app.forgeManifest
     };
@@ -215,7 +232,13 @@ export function initNews() {
           })) || [];
         dispatch({
           type: ActionTypes.UPDATE_NEWS,
-          news: newsArr.splice(0, 10)
+          news: newsArr
+            .map(v => ({
+              ...v,
+              title: he.decode(v?.title),
+              description: he.decode(v?.description)
+            }))
+            .splice(0, 10)
         });
       } catch (err) {
         console.error(err.message);
@@ -548,11 +571,12 @@ export function loginWithOAuthAccessToken(redirect = true) {
             })
           );
         }
+      } catch (err) {
+        console.warn('Could not fetch skin');
+      } finally {
         if (redirect) {
           dispatch(push('/home'));
         }
-      } catch (err) {
-        console.warn('Could not fetch skin');
       }
     }
   };
@@ -997,7 +1021,7 @@ export function updateInstanceConfig(
       const writeFileToDisk = async (content, tempP, p) => {
         await new Promise((resolve, reject) => {
           fss.open(tempP, 'w', async (err, fd) => {
-            if (err) reject(err);
+            if (err || !fd) reject(err);
 
             const buffer = Buffer.from(content);
             fss.write(
@@ -1183,6 +1207,11 @@ export function downloadForge(instanceName) {
       `${loader?.loaderVersion}.json`
     );
 
+    const mcJsonPath = path.join(
+      _getMinecraftVersionsPath(state),
+      `${loader?.mcVersion}.json`
+    );
+
     const sevenZipPath = await get7zPath();
     const pre152 = lte(coerce(loader?.mcVersion), coerce('1.5.2'));
     const pre132 = lte(coerce(loader?.mcVersion), coerce('1.3.2'));
@@ -1198,18 +1227,8 @@ export function downloadForge(instanceName) {
     );
 
     const extractSpecificFile = async from => {
-      const extraction = extractFull(tempInstaller, _getTempPath(state), {
-        $bin: sevenZipPath,
-        yes: true,
+      await extractAll(tempInstaller, _getTempPath(state), {
         $cherryPick: from
-      });
-      await new Promise((resolve, reject) => {
-        extraction.on('end', () => {
-          resolve();
-        });
-        extraction.on('error', error => {
-          reject(error.stderr);
-        });
       });
     };
 
@@ -1289,6 +1308,8 @@ export function downloadForge(instanceName) {
 
       await fse.outputJson(forgeJsonPath, forgeJson);
 
+      let skipForgeFilter = true;
+
       // Extract forge bin
       if (forgeJson.install.filePath) {
         await extractSpecificFile(forgeJson.install.filePath);
@@ -1301,7 +1322,7 @@ export function downloadForge(instanceName) {
           ),
           { overwrite: true }
         );
-      } else {
+      } else if (forgeJson.install.path) {
         // Move all files in maven
         const forgeBinPathInsideZip = path.join(
           'maven',
@@ -1329,6 +1350,9 @@ export function downloadForge(instanceName) {
         );
 
         await fse.remove(path.join(_getTempPath(state), 'maven'));
+      } else {
+        // Forge 1.17+
+        skipForgeFilter = false;
       }
 
       dispatch(
@@ -1344,8 +1368,9 @@ export function downloadForge(instanceName) {
       libraries = librariesMapper(
         libraries.filter(
           v =>
-            !v.name.includes('net.minecraftforge:forge:') &&
-            !v.name.includes('net.minecraftforge:minecraftforge:')
+            !skipForgeFilter ||
+            (!v.name.includes('net.minecraftforge:forge:') &&
+              !v.name.includes('net.minecraftforge:minecraftforge:'))
         ),
         _getLibrariesPath(state)
       );
@@ -1374,11 +1399,19 @@ export function downloadForge(instanceName) {
 
         await extractSpecificFile(path.join('data', 'client.lzma'));
 
+        const universalPath = forgeJson.install.libraries.find(v =>
+          (v.name || '').startsWith('net.minecraftforge:forge')
+        )?.name;
+
         await fse.move(
           path.join(_getTempPath(state), 'data', 'client.lzma'),
           path.join(
             _getLibrariesPath(state),
-            ...mavenToArray(forgeJson.install.path, '-clientdata', '.lzma')
+            ...mavenToArray(
+              forgeJson.install.path || universalPath,
+              '-clientdata',
+              '.lzma'
+            )
           ),
           { overwrite: true }
         );
@@ -1391,7 +1424,10 @@ export function downloadForge(instanceName) {
             `${forgeJson.install.minecraft}.jar`
           ),
           _getLibrariesPath(state),
-          _getJavaPath(state),
+          expectedInstaller,
+          mcJsonPath,
+          universalPath,
+          _getJavaPath(state)(8),
           (d, t) => dispatch(updateDownloadProgress((d * 100) / t))
         );
       }
@@ -1453,7 +1489,8 @@ export function downloadForge(instanceName) {
 
       const metaInfDeletion = Seven.delete(mcJarForgePath, 'META-INF', {
         $bin: sevenZipPath,
-        yes: true
+        yes: true,
+        $spawnOptions: { shell: true }
       });
       await new Promise((resolve, reject) => {
         metaInfDeletion.on('end', () => {
@@ -1467,22 +1504,10 @@ export function downloadForge(instanceName) {
       await fse.remove(path.join(_getTempPath(state), loader?.loaderVersion));
 
       // This is garbage, need to use a stream somehow to directly inject data from/to jar
-      const extraction = extractFull(
+      await extractAll(
         tempInstaller,
-        path.join(_getTempPath(state), loader?.loaderVersion),
-        {
-          $bin: sevenZipPath,
-          yes: true
-        }
+        path.join(_getTempPath(state), loader?.loaderVersion)
       );
-      await new Promise((resolve, reject) => {
-        extraction.on('end', () => {
-          resolve();
-        });
-        extraction.on('error', error => {
-          reject(error.stderr);
-        });
-      });
 
       dispatch(updateDownloadProgress(50));
 
@@ -1491,7 +1516,8 @@ export function downloadForge(instanceName) {
         `${path.join(_getTempPath(state), loader?.loaderVersion)}/*`,
         {
           $bin: sevenZipPath,
-          yes: true
+          yes: true,
+          $spawnOptions: { shell: true }
         }
       );
       await new Promise((resolve, reject) => {
@@ -1570,7 +1596,9 @@ export function processFTBManifest(instanceName) {
     const { exactMatches } = data || {};
 
     for (const item of exactMatches) {
-      fileHashes[item.file.packageFingerprint] = item;
+      if (item.file) {
+        fileHashes[item.file.packageFingerprint] = item;
+      }
     }
 
     mappedFiles = mappedFiles.filter(
@@ -1649,15 +1677,46 @@ export function processFTBManifest(instanceName) {
 export function processForgeManifest(instanceName) {
   return async (dispatch, getState) => {
     const state = getState();
-    const { manifest } = _getCurrentDownloadItem(state);
+    const { manifest, loader } = _getCurrentDownloadItem(state);
     const concurrency = state.settings.concurrentDownloads;
 
     dispatch(updateDownloadStatus(instanceName, 'Downloading mods...'));
+
+    const addonsHashmap = {};
+    const addonsFilesHashmap = {};
+
+    const _getAddons = async () => {
+      const { data: addons } = await getMultipleAddons(
+        manifest.files.map(v => v.projectID)
+      );
+
+      addons.forEach(v => {
+        addonsHashmap[v.id] = v;
+      });
+    };
+
+    const _getAddonFiles = async () => {
+      await pMap(
+        manifest.files,
+        async item => {
+          const { data: modManifest } = await getAddonFile(
+            item.projectID,
+            item.fileID
+          );
+
+          addonsFilesHashmap[item.projectID] = modManifest;
+        },
+        { concurrency: concurrency + 10 }
+      );
+    };
+
+    await Promise.all([_getAddons(), _getAddonFiles()]);
 
     let modManifests = [];
     await pMap(
       manifest.files,
       async item => {
+        if (!addonsHashmap[item.projectID]) return;
         let ok = false;
         let tries = 0;
         /* eslint-disable no-await-in-loop */
@@ -1667,10 +1726,8 @@ export function processForgeManifest(instanceName) {
             await new Promise(resolve => setTimeout(resolve, 5000));
           }
           try {
-            const { data: addon } = await getAddon(item.projectID);
-            const modManifest = (
-              await getAddonFile(item.projectID, item.fileID)
-            ).data;
+            const addon = addonsHashmap[item.projectID];
+            const modManifest = addonsFilesHashmap[item.projectID];
             const destFile = path.join(
               _getInstancesPath(state),
               instanceName,
@@ -1698,91 +1755,118 @@ export function processForgeManifest(instanceName) {
       { concurrency }
     );
 
-    dispatch(updateDownloadStatus(instanceName, 'Copying overrides...'));
+    let validAddon = false;
     const addonPathZip = path.join(
       _getTempPath(state),
       instanceName,
       'addon.zip'
     );
-    const sevenZipPath = await get7zPath();
-    const extraction = extractFull(
-      addonPathZip,
-      path.join(_getTempPath(state), instanceName),
-      {
-        recursive: true,
-        $bin: sevenZipPath,
-        yes: true,
-        $cherryPick: 'overrides',
-        $progress: true
-      }
-    );
-    await new Promise((resolve, reject) => {
-      let progress = 0;
-      extraction.on('progress', ({ percent }) => {
-        if (percent !== progress) {
-          progress = percent;
-          dispatch(updateDownloadProgress(percent));
+
+    try {
+      await fs.stat(addonPathZip);
+      validAddon = true;
+    } catch {
+      // If project and file id are provided, we download it on the spot
+      if (loader.projectID && loader.fileID) {
+        const { data } = await getAddonFile(loader.projectID, loader.fileID);
+        try {
+          await downloadFile(addonPathZip, data.downloadUrl);
+          validAddon = true;
+        } catch {
+          // NO-OP
         }
-      });
-      extraction.on('end', () => {
-        resolve();
-      });
-      extraction.on('error', err => {
-        reject(err.stderr);
-      });
-    });
+      }
+    }
 
-    dispatch(updateDownloadStatus(instanceName, 'Finalizing overrides...'));
-
-    const overrideFiles = await getFilesRecursive(
-      path.join(_getTempPath(state), instanceName, 'overrides')
-    );
-    await dispatch(
-      updateInstanceConfig(instanceName, config => {
-        return {
-          ...config,
-          mods: [...(config.mods || []), ...modManifests],
-          overrides: overrideFiles.map(v =>
-            path.relative(
-              path.join(_getTempPath(state), instanceName, 'overrides'),
-              v
-            )
-          )
-        };
-      })
-    );
-
-    await new Promise(resolve => {
-      // Force premature unlock to let our listener catch mods from override
-      lockfile.unlock(
-        path.join(
-          _getInstancesPath(getState()),
-          instanceName,
-          'installing.lock'
-        ),
-        err => {
-          if (err) console.error(err);
-          resolve();
+    if (validAddon) {
+      dispatch(updateDownloadStatus(instanceName, 'Copying overrides...'));
+      let progress = 0;
+      await extractAll(
+        addonPathZip,
+        path.join(_getTempPath(state), instanceName),
+        {
+          recursive: true,
+          $cherryPick: 'overrides',
+          $progress: true
+        },
+        {
+          progress: percent => {
+            if (percent !== progress) {
+              progress = percent;
+              dispatch(updateDownloadProgress(percent));
+            }
+          }
         }
       );
-    });
 
-    await Promise.all(
-      overrideFiles.map(v => {
-        const relativePath = path.relative(
-          path.join(_getTempPath(state), instanceName, 'overrides'),
-          v
-        );
-        const newPath = path.join(
-          _getInstancesPath(state),
-          instanceName,
-          relativePath
-        );
-        return fse.copy(v, newPath, { overwrite: true });
-      })
-    );
+      dispatch(updateDownloadStatus(instanceName, 'Finalizing overrides...'));
 
-    await fse.remove(addonPathZip);
+      const overrideFiles = await getFilesRecursive(
+        path.join(_getTempPath(state), instanceName, 'overrides')
+      );
+      await dispatch(
+        updateInstanceConfig(instanceName, config => {
+          return {
+            ...config,
+            mods: [...(config.mods || []), ...modManifests],
+            overrides: overrideFiles.map(v =>
+              path.relative(
+                path.join(_getTempPath(state), instanceName, 'overrides'),
+                v
+              )
+            )
+          };
+        })
+      );
+
+      await new Promise(resolve => {
+        // Force premature unlock to let our listener catch mods from override
+        lockfile.unlock(
+          path.join(
+            _getInstancesPath(getState()),
+            instanceName,
+            'installing.lock'
+          ),
+          err => {
+            if (err) console.error(err);
+            resolve();
+          }
+        );
+      });
+
+      await Promise.all(
+        overrideFiles.map(v => {
+          const relativePath = path.relative(
+            path.join(_getTempPath(state), instanceName, 'overrides'),
+            v
+          );
+          const newPath = path.join(
+            _getInstancesPath(state),
+            instanceName,
+            relativePath
+          );
+          return fse.copy(v, newPath, { overwrite: true });
+        })
+      );
+
+      await fse.remove(addonPathZip);
+    } else {
+      await new Promise(resolve => {
+        // Force premature unlock to let our listener catch mods from override
+        lockfile.unlock(
+          path.join(
+            _getInstancesPath(getState()),
+            instanceName,
+            'installing.lock'
+          ),
+          err => {
+            if (err) console.error(err);
+            resolve();
+          }
+        );
+      });
+    }
+
     await fse.remove(path.join(_getTempPath(state), instanceName));
   };
 }
@@ -1864,6 +1948,23 @@ export function downloadInstance(instanceName) {
       })
     );
 
+    if (mcJson.logging) {
+      const {
+        sha1: loggingHash,
+        id: loggingId,
+        url: loggingUrl
+      } = mcJson.logging.client.file;
+      await downloadFile(
+        path.join(
+          _getAssetsPath(state),
+          'objects',
+          loggingHash.substring(0, 2),
+          loggingId
+        ),
+        loggingUrl
+      );
+    }
+
     const libraries = librariesMapper(
       mcJson.libraries,
       _getLibrariesPath(state)
@@ -1889,7 +1990,7 @@ export function downloadInstance(instanceName) {
     );
 
     // Wait 400ms to avoid "The process cannot access the file because it is being used by another process."
-    await new Promise(resolve => setTimeout(() => resolve(), 400));
+    await new Promise(resolve => setTimeout(() => resolve(), 1000));
 
     await extractNatives(
       libraries,
@@ -2004,14 +2105,21 @@ export const changeModpackVersion = (instanceName, newModpackData) => {
         imageURL
       );
 
-      const loader = {
-        loaderType: instance.loader?.loaderType,
-        mcVersion: newManifest.minecraft.version,
-        loaderVersion: convertcurseForgeToCanonical(
+      let loaderVersion;
+      if (instance.loader?.loaderType === FABRIC) {
+        loaderVersion = extractFabricVersionFromManifest(newManifest);
+      } else {
+        loaderVersion = convertcurseForgeToCanonical(
           newManifest.minecraft.modLoaders.find(v => v.primary).id,
           newManifest.minecraft.version,
           state.app.forgeManifest
-        ),
+        );
+      }
+
+      const loader = {
+        loaderType: instance.loader?.loaderType,
+        mcVersion: newManifest.minecraft.version,
+        loaderVersion,
         fileID: instance.loader?.fileID,
         projectID: instance.loader?.projectID,
         source: instance.loader?.source
@@ -2200,7 +2308,7 @@ export const startListener = () => {
       const processChange = async () => {
         const newState = getState();
         const instances = newState.instances.list;
-        const modData = instances[oldInstanceName].mods.find(
+        const modData = (instances[oldInstanceName].mods || []).find(
           m => m.fileName === path.basename(fileName)
         );
         if (modData) {
@@ -2512,10 +2620,24 @@ export const startListener = () => {
   };
 };
 
-export function launchInstance(instanceName) {
+export function getJavaVersionForMCVersion(mcVersion) {
+  return (_, getState) => {
+    const { app } = getState();
+    const { versions } = app?.vanillaManifest || {};
+    if (versions) {
+      const version = versions.find(v => v.id === mcVersion);
+      const javaLatestInitialDate = new Date('2021-05-27T09:39:21+00:00');
+      if (new Date(version?.releaseTime) < javaLatestInitialDate) {
+        return 8;
+      }
+    }
+    return LATEST_JAVA_VERSION;
+  };
+}
+
+export function launchInstance(instanceName, forceQuit = false) {
   return async (dispatch, getState) => {
     const state = getState();
-    const defaultJavaPath = _getJavaPath(state);
 
     const { userData } = state;
     const account = _getCurrentAccount(state);
@@ -2524,15 +2646,63 @@ export function launchInstance(instanceName) {
     const { memory, args } = state.settings.java;
     const { resolution: globalMinecraftResolution } =
       state.settings.minecraftSettings;
+    const instanceState = _getInstance(state)(instanceName);
     const {
       loader,
       javaArgs,
       javaMemory,
       customJavaPath,
       resolution: instanceResolution
-    } = _getInstance(state)(instanceName);
+    } = instanceState;
 
-    const javaPath = customJavaPath || defaultJavaPath;
+    const mcJsonPath = path.join(
+      _getMinecraftVersionsPath(state),
+      `${loader?.mcVersion}.json`
+    );
+
+    let discordRPCDetails = `Minecraft ${loader?.mcVersion}`;
+
+    if (loader.source && loader.sourceName) {
+      discordRPCDetails = `${loader.sourceName}`;
+    }
+
+    ipcRenderer.invoke('update-discord-rpc', discordRPCDetails);
+
+    const defaultJavaPathVersion = _getJavaPath(state)(
+      dispatch(getJavaVersionForMCVersion(loader?.mcVersion))
+    );
+    const javaPath = customJavaPath || defaultJavaPathVersion;
+    let missingResource = false;
+
+    const verifyResource = async resourcePath => {
+      if (forceQuit) return true;
+      try {
+        await fs.access(resourcePath);
+        return true;
+      } catch {
+        console.warn(`Missing resource: ${resourcePath}`);
+        dispatch(
+          addToQueue(
+            instanceName,
+            instanceState.loader,
+            null,
+            instanceState.background
+          )
+        );
+
+        await new Promise(resolve => {
+          const unsubscribe = window.__store.subscribe(() => {
+            if (!getState().downloadQueue[instanceName]) {
+              unsubscribe();
+              return resolve();
+            }
+          });
+        });
+
+        dispatch(launchInstance(instanceName));
+        return false;
+      }
+    };
 
     const instancePath = path.join(_getInstancesPath(state), instanceName);
 
@@ -2549,15 +2719,72 @@ export function launchInstance(instanceName) {
 
     let errorLogs = '';
 
-    const mcJson = await fse.readJson(
-      path.join(_getMinecraftVersionsPath(state), `${loader?.mcVersion}.json`)
+    // Verify main jar JSON
+    let verified = await verifyResource(mcJsonPath);
+    if (!verified) return;
+
+    const mcJson = await fse.readJson(mcJsonPath);
+
+    if (mcJson.logging) {
+      // Verify logging xml
+      const { sha1: loggingHash, id: loggingId } = mcJson.logging.client.file;
+      if (loggingHash && loggingId) {
+        const loggingPath = path.join(
+          _getAssetsPath(state),
+          'objects',
+          loggingHash.substring(0, 2),
+          loggingId
+        );
+        verified = await verifyResource(loggingPath);
+        if (!verified) return;
+      }
+    }
+
+    // Verify assets
+    const assetsFile = path.join(
+      _getAssetsPath(state),
+      'indexes',
+      `${mcJson.assets}.json`
     );
+    verified = await verifyResource(assetsFile);
+    if (!verified) return;
+    await fse.readJson(assetsFile);
+    const assetsJson = await fse.readJson(assetsFile);
+
+    const assets = Object.entries(assetsJson.objects).map(
+      ([assetKey, { hash }]) => ({
+        url: `${MC_RESOURCES_URL}/${hash.substring(0, 2)}/${hash}`,
+        type: 'asset',
+        sha1: hash,
+        path: path.join(
+          _getAssetsPath(state),
+          'objects',
+          hash.substring(0, 2),
+          hash
+        ),
+        resourcesPath: path.join(
+          _getInstancesPath(state),
+          instanceName,
+          'resources',
+          assetKey
+        ),
+        legacyPath: path.join(
+          _getAssetsPath(state),
+          'virtual',
+          'legacy',
+          assetKey
+        )
+      })
+    );
+
     let libraries = [];
     let mcMainFile = {
       url: mcJson.downloads.client.url,
       sha1: mcJson.downloads.client.sha1,
       path: path.join(_getMinecraftVersionsPath(state), `${mcJson.id}.jar`)
     };
+    verified = await verifyResource(mcMainFile.path);
+    if (!verified) return;
 
     if (loader && loader?.loaderType === 'fabric') {
       const fabricJsonPath = path.join(
@@ -2568,6 +2795,10 @@ export function launchInstance(instanceName) {
         loader?.loaderVersion,
         'fabric.json'
       );
+
+      verified = await verifyResource(fabricJsonPath);
+      if (!verified) return;
+
       const fabricJson = await fse.readJson(fabricJsonPath);
       const fabricLibraries = librariesMapper(
         fabricJson.libraries,
@@ -2577,6 +2808,16 @@ export function launchInstance(instanceName) {
       // Replace classname
       mcJson.mainClass = fabricJson.mainClass;
     } else if (loader && loader?.loaderType === 'forge') {
+      const forgeJsonPath = path.join(
+        _getLibrariesPath(state),
+        'net',
+        'minecraftforge',
+        loader?.loaderVersion,
+        `${loader?.loaderVersion}.json`
+      );
+      verified = await verifyResource(forgeJsonPath);
+      if (!verified) return;
+
       if (gt(coerce(loader?.mcVersion), coerce('1.5.2'))) {
         const getForgeLastVer = ver =>
           Number.parseInt(ver.split('.')[ver.split('.').length - 1], 10);
@@ -2589,7 +2830,7 @@ export function launchInstance(instanceName) {
         ) {
           const moveJavaLegacyFixerToInstance = async () => {
             await fs.lstat(path.join(_getDataStorePath(state), '__JLF__.jar'));
-            await fse.move(
+            await fse.copy(
               path.join(_getDataStorePath(state), '__JLF__.jar'),
               instanceJLFPath
             );
@@ -2601,14 +2842,6 @@ export function launchInstance(instanceName) {
             await moveJavaLegacyFixerToInstance();
           }
         }
-
-        const forgeJsonPath = path.join(
-          _getLibrariesPath(state),
-          'net',
-          'minecraftforge',
-          loader?.loaderVersion,
-          `${loader?.loaderVersion}.json`
-        );
         const forgeJson = await fse.readJson(forgeJsonPath);
         const forgeLibraries = librariesMapper(
           forgeJson.version.libraries,
@@ -2620,6 +2853,28 @@ export function launchInstance(instanceName) {
         if (forgeJson.version.minecraftArguments) {
           mcJson.minecraftArguments = forgeJson.version.minecraftArguments;
         } else if (forgeJson.version.arguments.game) {
+          // 1.17 check
+          if (forgeJson.version.arguments.jvm) {
+            mcJson.forge = { arguments: {} };
+            mcJson.forge.arguments.jvm = forgeJson.version.arguments.jvm.map(
+              arg => {
+                return arg
+                  .replace(/\${version_name}/g, mcJson.id)
+                  .replace(
+                    /=\${library_directory}/g,
+                    `="${_getLibrariesPath(state)}"`
+                  )
+                  .replace(
+                    /\${library_directory}/g,
+                    `${_getLibrariesPath(state)}`
+                  )
+                  .replace(
+                    /\${classpath_separator}/g,
+                    process.platform === 'win32' ? ';' : ':'
+                  );
+              }
+            );
+          }
           mcJson.arguments.game = mcJson.arguments.game.concat(
             forgeJson.version.arguments.game
           );
@@ -2637,6 +2892,40 @@ export function launchInstance(instanceName) {
       libraries.concat(librariesMapper(mcJson.libraries, librariesPath)),
       'url'
     );
+
+    for (const resource of [...libraries, ...assets]) {
+      try {
+        await fs.access(resource.path);
+      } catch {
+        console.warn(`Missing resource: ${resource.path}`);
+        missingResource = true;
+      }
+    }
+
+    if (missingResource) {
+      dispatch(
+        addToQueue(
+          instanceName,
+          instanceState.loader,
+          null,
+          instanceState.background
+        )
+      );
+
+      await new Promise(resolve => {
+        const unsubscribe = window.__store.subscribe(() => {
+          if (!getState().downloadQueue[instanceName]) {
+            unsubscribe();
+            return resolve();
+          }
+        });
+      });
+
+      dispatch(launchInstance(instanceName, true));
+      return;
+    }
+    ga.sendCustomEvent('launchedInstance');
+    dispatch(openModal('InstanceStartupAd', { instanceName }));
 
     const getJvmArguments =
       mcJson.assets !== 'legacy' && gte(coerce(mcJson.assets), coerce('1.13'))
@@ -2660,16 +2949,30 @@ export function launchInstance(instanceName) {
       javaArguments
     );
 
+    const { mcStartupMethod } = state.settings;
+    let replaceWith = `..${path.sep}..`;
+
     const symLinkDirPath = path.join(userData.split('\\')[0], '_gdl');
+    if (MC_STARTUP_METHODS[mcStartupMethod] === MC_STARTUP_METHODS.SYMLINK) {
+      replaceWith = symLinkDirPath;
+      if (process.platform === 'win32') await symlink(userData, symLinkDirPath);
+    }
 
     const replaceRegex = [
       process.platform === 'win32'
         ? new RegExp(userData.replace(/([.?*+^$[\]\\(){}|-])/g, '\\$1'), 'g')
         : null,
-      symLinkDirPath
+      replaceWith
     ];
 
-    if (process.platform === 'win32') await symlink(userData, symLinkDirPath);
+    const { sha1: loggingHash, id: loggingId } =
+      mcJson?.logging?.client?.file || {};
+    const loggingPath = path.join(
+      assetsPath,
+      'objects',
+      loggingHash.substring(0, 2),
+      loggingId
+    );
 
     console.log(
       `"${javaPath}" ${getJvmArguments(
@@ -2683,16 +2986,33 @@ export function launchInstance(instanceName) {
         gameResolution,
         true,
         javaArguments
-      ).join(' ')}`.replace(...replaceRegex)
+      ).join(' ')}`
+        .replace(...replaceRegex)
+        .replace(
+          // eslint-disable-next-line no-template-curly-in-string
+          '-Dlog4j.configurationFile=${path}',
+          `-Dlog4j.configurationFile="${loggingPath}"`
+        )
     );
 
     if (state.settings.hideWindowOnGameLaunch) {
       await ipcRenderer.invoke('hide-window');
     }
 
+    let closed = false;
+
     const ps = spawn(
-      `"${javaPath.replace(...replaceRegex)}"`,
-      jvmArguments.map(v => v.replace(...replaceRegex)),
+      `"${javaPath}"`,
+      jvmArguments.map(v =>
+        v
+          .toString()
+          .replace(...replaceRegex)
+          .replace(
+            // eslint-disable-next-line no-template-curly-in-string
+            '-Dlog4j.configurationFile=${path}',
+            `-Dlog4j.configurationFile="${loggingPath}"`
+          )
+      ),
       {
         cwd: instancePath,
         shell: true
@@ -2714,11 +3034,21 @@ export function launchInstance(instanceName) {
         lastPlayed: Date.now()
       }))
     );
-    dispatch(addStartedInstance({ instanceName, pid: ps.pid }));
+    dispatch(updateStartedInstance({ instanceName, pid: ps.pid }));
 
     ps.stdout.on('data', data => {
       console.log(data.toString());
-      if (data.toString().includes('Setting user:')) {
+      if (
+        data.toString().includes('Setting user:') ||
+        data.toString().includes('Initializing LWJGL OpenAL')
+      ) {
+        if (
+          !closed &&
+          getState().modals.find(v => v.modalType === 'InstanceStartupAd')
+        ) {
+          closed = true;
+          dispatch(closeModal());
+        }
         dispatch(updateStartedInstance({ instanceName, initialized: true }));
       }
     });
@@ -2733,19 +3063,36 @@ export function launchInstance(instanceName) {
       if (!ps.killed) {
         ps.kill('SIGKILL');
       }
+      ipcRenderer.invoke('reset-discord-rpc');
       await new Promise(resolve => setTimeout(resolve, 200));
       ipcRenderer.invoke('show-window');
       dispatch(removeStartedInstance(instanceName));
       await fse.remove(instanceJLFPath);
-      if (process.platform === 'win32') fse.remove(symLinkDirPath);
       await fs.unlink(backupConfigPath);
+
+      if (
+        process.platform === 'win32' &&
+        MC_STARTUP_METHODS[mcStartupMethod] === MC_STARTUP_METHODS.SYMLINK
+      ) {
+        fse.remove(symLinkDirPath);
+      }
+
+      if (
+        !closed &&
+        getState().modals.find(v => v.modalType === 'InstanceStartupAd')
+      ) {
+        dispatch(closeModal());
+      }
+
       if (code !== 0 && errorLogs) {
-        dispatch(
-          openModal('InstanceCrashed', {
-            code,
-            errorLogs: errorLogs?.toString('utf8')
-          })
-        );
+        setTimeout(() => {
+          dispatch(
+            openModal('InstanceCrashed', {
+              code,
+              errorLogs: errorLogs?.toString('utf8')
+            })
+          );
+        }, 225);
         console.warn(`Process exited with code ${code}. Not too good..`);
       }
     });
@@ -2915,29 +3262,36 @@ export const initLatestMods = instanceName => {
     const manifests = await pMap(
       modsToInit,
       async mod => {
-        const { data } = await getAddonFiles(mod);
+        let data = null;
+        try {
+          ({ data } = await getAddonFiles(mod));
+        } catch {
+          // nothing
+        }
         return { projectID: mod, data };
       },
       { concurrency: 40 }
     );
     const manifestsObj = {};
-    manifests.map(v => {
-      // Find latest version for each mod
-      const [latestMod] =
-        getPatchedInstanceType(instance) === FORGE || v.projectID === 361988
-          ? filterForgeFilesByVersion(v.data, instance.loader?.mcVersion)
-          : filterFabricFilesByVersion(v.data, instance.loader?.mcVersion);
-      if (latestMod) {
-        manifestsObj[v.projectID] = latestMod;
-      }
-      return null;
-    });
+    manifests
+      .filter(v => v.data)
+      .map(v => {
+        // Find latest version for each mod
+        const [latestMod] =
+          getPatchedInstanceType(instance) === FORGE || v.projectID === 361988
+            ? filterForgeFilesByVersion(v.data, instance.loader?.mcVersion)
+            : filterFabricFilesByVersion(v.data, instance.loader?.mcVersion);
+        if (latestMod) {
+          manifestsObj[v.projectID] = latestMod;
+        }
+        return null;
+      });
 
     dispatch(updateLatestModManifests(manifestsObj));
   };
 };
 
-export const getAppLatestVersion = async () => {
+export const isNewVersionAvailable = async () => {
   const { data: latestReleases } = await axios.get(
     'https://api.github.com/repos/gorilla-devs/GDLauncher/releases?per_page=10'
   );
@@ -2945,33 +3299,40 @@ export const getAppLatestVersion = async () => {
   const latestPrerelease = latestReleases.find(v => v.prerelease);
   const latestStablerelease = latestReleases.find(v => !v.prerelease);
 
-  const appData = parse(await ipcRenderer.invoke('getAppdataPath'));
+  const appData = await ipcRenderer.invoke('getAppdataPath');
+
   let releaseChannel = 0;
 
   try {
     const rChannel = await fs.readFile(
       path.join(appData, 'gdlauncher_next', 'rChannel')
     );
-    releaseChannel = rChannel.toString();
+    releaseChannel = parseInt(rChannel.toString(), 10);
   } catch {
     // swallow error
   }
 
   const v = await ipcRenderer.invoke('getAppVersion');
 
-  const installedVersion = parse(v);
-  const isAppUpdated = r => !lt(installedVersion, parse(r.tag_name));
-
-  // If we're on beta but the release channel is stable, return latest stable to force an update
-  if (v.includes('beta') && releaseChannel === 0) {
+  const isAppUpdated = r => gte(v, r.tag_name);
+  if (
+    releaseChannel === 0 &&
+    (prerelease(v) || !isAppUpdated(latestStablerelease))
+  ) {
     return latestStablerelease;
   }
-
-  if (!isAppUpdated(latestStablerelease)) {
-    return latestStablerelease;
-  }
-  if (!isAppUpdated(latestPrerelease) && releaseChannel !== 0) {
-    return latestPrerelease;
+  if (releaseChannel !== 0) {
+    if (
+      !isAppUpdated(latestStablerelease) &&
+      (major(latestStablerelease.tag_name) > major(v) ||
+        minor(latestStablerelease.tag_name) > minor(v) ||
+        patch(latestStablerelease.tag_name) > patch(v))
+    ) {
+      return latestStablerelease;
+    }
+    if (latestPrerelease && !isAppUpdated(latestPrerelease)) {
+      return latestPrerelease;
+    }
   }
 
   return false;
@@ -2984,15 +3345,14 @@ export const checkForPortableUpdates = () => {
 
     const tempFolder = path.join(_getTempPath(state), `update`);
 
-    const latestVersion = await getAppLatestVersion();
+    const newVersion = await isNewVersionAvailable();
 
     // Latest version has a value only if the user is not using the latest
-    if (latestVersion) {
-      const baseAssetUrl = `https://github.com/gorilla-devs/GDLauncher/releases/download/${latestVersion?.tag_name}`;
+    if (newVersion) {
+      const baseAssetUrl = `https://github.com/gorilla-devs/GDLauncher/releases/download/${newVersion?.tag_name}`;
       const { data: latestManifest } = await axios.get(
         `${baseAssetUrl}/${process.platform}_latest.json`
       );
-      console.log('inside', latestVersion);
       // Cleanup all files that are not required for the update
       await makeDir(tempFolder);
 
@@ -3102,6 +3462,6 @@ export const checkForPortableUpdates = () => {
         { concurrency: 3 }
       );
     }
-    return latestVersion;
+    return newVersion;
   };
 };

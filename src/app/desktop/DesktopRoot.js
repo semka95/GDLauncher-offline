@@ -1,4 +1,4 @@
-import React, { useEffect, memo, useState } from 'react';
+import React, { useEffect, memo } from 'react';
 import { useDidMount } from 'rooks';
 import styled from 'styled-components';
 import { Switch } from 'react-router';
@@ -33,7 +33,10 @@ import SystemNavbar from './components/SystemNavbar';
 import useTrackIdle from './utils/useTrackIdle';
 import { openModal } from '../../common/reducers/modals/actions';
 import Message from './components/Message';
-import { ACCOUNT_MICROSOFT } from '../../common/utils/constants';
+import {
+  ACCOUNT_MICROSOFT,
+  LATEST_JAVA_VERSION
+} from '../../common/utils/constants';
 
 const Wrapper = styled.div`
   height: 100vh;
@@ -57,10 +60,11 @@ function DesktopRoot({ store }) {
   const currentAccount = useSelector(_getCurrentAccount);
   const clientToken = useSelector(state => state.app.clientToken);
   const javaPath = useSelector(state => state.settings.java.path);
+  const javaLatestPath = useSelector(state => state.settings.java.pathLatest);
   const location = useSelector(state => state.router.location);
-  const modals = useSelector(state => state.modals);
+  // const modals = useSelector(state => state.modals);
   const shouldShowDiscordRPC = useSelector(state => state.settings.discordRPC);
-  const [contentStyle, setContentStyle] = useState({ transform: 'scale(1)' });
+  // const [contentStyle, setContentStyle] = useState({ transform: 'scale(1)' });
 
   message.config({
     top: 45,
@@ -76,13 +80,27 @@ function DesktopRoot({ store }) {
 
     const manifests = await dispatch(initManifests());
 
-    let isJavaOK = javaPath;
+    let isJava8OK = javaPath;
+    let isJavaLatestOk = javaLatestPath;
 
-    if (!isJavaOK) {
-      isJavaOK = await isLatestJavaDownloaded(manifests.java, userData, true);
+    if (!javaPath) {
+      ({ isValid: isJava8OK } = await isLatestJavaDownloaded(
+        manifests,
+        userData,
+        true
+      ));
     }
 
-    if (!isJavaOK) {
+    if (!isJavaLatestOk) {
+      ({ isValid: isJavaLatestOk } = await isLatestJavaDownloaded(
+        manifests,
+        userData,
+        true,
+        LATEST_JAVA_VERSION
+      ));
+    }
+
+    if (!isJava8OK || !isJavaLatestOk) {
       dispatch(openModal('JavaSetup', { preventClose: true }));
 
       // Super duper hacky solution to await the modal to be closed...
@@ -143,6 +161,12 @@ function DesktopRoot({ store }) {
   useDidMount(init);
 
   useEffect(() => {
+    if (!currentAccount) {
+      dispatch(push('/'));
+    }
+  }, [currentAccount]);
+
+  useEffect(() => {
     if (clientToken && process.env.NODE_ENV !== 'development') {
       ga.setUserId(clientToken);
       ga.trackPage(location.pathname);
@@ -151,23 +175,23 @@ function DesktopRoot({ store }) {
 
   useTrackIdle(location.pathname);
 
-  useEffect(() => {
-    if (
-      modals[0] &&
-      modals[0].modalType === 'Settings' &&
-      !modals[0].unmounting
-    ) {
-      setContentStyle({ transform: 'scale(0.4)' });
-    } else {
-      setContentStyle({ transform: 'scale(1)' });
-    }
-  }, [modals]);
+  // useEffect(() => {
+  //   if (
+  //     modals[0] &&
+  //     modals[0].modalType === 'Settings' &&
+  //     !modals[0].unmounting
+  //   ) {
+  //     setContentStyle({ transform: 'scale(0.4)' });
+  //   } else {
+  //     setContentStyle({ transform: 'scale(1)' });
+  //   }
+  // }, [modals]);
 
   return (
     <Wrapper>
       <SystemNavbar />
       <Message />
-      <Container style={contentStyle}>
+      <Container>
         <GlobalStyles />
         <RouteBackground />
         <Switch>

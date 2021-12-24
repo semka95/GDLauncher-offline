@@ -6,13 +6,10 @@ import { Transition } from 'react-transition-group';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowRight,
-  faExclamationCircle,
-  faCheckCircle,
   faExternalLinkAlt
 } from '@fortawesome/free-solid-svg-icons';
 import { Input, Button, Checkbox } from 'antd';
 import { useKey } from 'rooks';
-import axios from 'axios';
 import { login, loginOAuth } from '../../../common/reducers/actions';
 import { load, requesting } from '../../../common/reducers/loading/actions';
 import features from '../../../common/reducers/loading/features';
@@ -27,7 +24,7 @@ const LoginButton = styled(Button)`
     props.active ? props.theme.palette.grey[600] : 'transparent'};
   border: 0;
   height: auto;
-  margin-top: 40px;
+  margin-top: 20px;
   text-align: center;
   color: ${props => props.theme.palette.text.primary};
   &:hover {
@@ -78,7 +75,7 @@ const Form = styled.div`
   flex-direction: column;
   justify-content: space-around;
   align-items: center;
-  margin: 40px 0 !important;
+  margin: 20px 0 !important;
 `;
 
 const Background = styled.div`
@@ -108,19 +105,12 @@ const Header = styled.div`
 
 const Footer = styled.div`
   position: absolute;
-  bottom: 0;
+  bottom: 4px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
   width: calc(100% - 80px);
-`;
-
-const Status = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: ${props => props.theme.palette.text.third};
 `;
 
 const FooterLinks = styled.div`
@@ -152,22 +142,6 @@ const LoginFailMessage = styled.div`
   color: ${props => props.theme.palette.colors.red};
 `;
 
-const StatusIcon = ({ color }) => {
-  return (
-    <FontAwesomeIcon
-      icon={color === 'red' ? faExclamationCircle : faCheckCircle}
-      color={color}
-      css={`
-        margin: 0 5px;
-        color: ${props =>
-          props.color === 'green'
-            ? props.theme.palette.colors.green
-            : props.theme.palette.error.main};
-      `}
-    />
-  );
-};
-
 const Login = () => {
   const dispatch = useDispatch();
   const [email, setEmail] = useState(null);
@@ -175,7 +149,6 @@ const Login = () => {
   const [offlineMode, setOfflineMode] = useState(false);
   const [version, setVersion] = useState(null);
   const [loginFailed, setLoginFailed] = useState(false);
-  const [status, setStatus] = useState({});
   const loading = useSelector(
     state => state.loading.accountAuthentication.isRequesting
   );
@@ -210,18 +183,10 @@ const Login = () => {
     }, 1000);
   };
 
-  const fetchStatus = async () => {
-    const { data } = await axios.get('https://status.mojang.com/check');
-    const result = {};
-    Object.assign(result, ...data);
-    setStatus(result);
-  };
-
   useKey(['Enter'], authenticate);
 
   useEffect(() => {
     ipcRenderer.invoke('getAppVersion').then(setVersion).catch(console.error);
-    fetchStatus().catch(console.error);
   }, []);
 
   return (
@@ -232,7 +197,6 @@ const Login = () => {
             <Header>
               <HorizontalLogo size={200} />
             </Header>
-            <p>Sign in with your Mojang Account</p>
             <Form>
               <div>
                 <Input
@@ -288,12 +252,7 @@ const Login = () => {
               >
                 <FooterLinks>
                   <div>
-                    <a href="https://my.minecraft.net/en-us/store/minecraft/#register">
-                      CREATE AN ACCOUNT
-                    </a>
-                  </div>
-                  <div>
-                    <a href="https://my.minecraft.net/en-us/password/forgot/">
+                    <a href="https://www.minecraft.net/it-it/password/forgot">
                       FORGOT PASSWORD
                     </a>
                   </div>
@@ -307,12 +266,52 @@ const Login = () => {
                   v{version}
                 </div>
               </div>
-              <Status>
-                Auth: <StatusIcon color={status['authserver.mojang.com']} />
-                Session: <StatusIcon color={status['session.minecraft.net']} />
-                Skins: <StatusIcon color={status['textures.minecraft.net']} />
-                API: <StatusIcon color={status['api.mojang.com']} />
-              </Status>
+              <p
+                css={`
+                  font-size: 10px;
+                `}
+              >
+                Sign in with your Mojang Account. By doing so, you accept all
+                our policies and terms stated below.
+              </p>
+              <div
+                css={`
+                  margin-top: 20px;
+                  font-size: 10px;
+                  display: flex;
+                  width: 100%;
+                  text-align: center;
+                  flex-direction: row;
+                  span {
+                    text-decoration: underline;
+                    cursor: pointer;
+                  }
+                `}
+              >
+                <span
+                  onClick={() =>
+                    dispatch(openModal('PolicyModal', { policy: 'privacy' }))
+                  }
+                >
+                  Privacy Policy
+                </span>
+                <span
+                  onClick={() =>
+                    dispatch(openModal('PolicyModal', { policy: 'tos' }))
+                  }
+                >
+                  Terms and Conditions
+                </span>
+                <span
+                  onClick={() =>
+                    dispatch(
+                      openModal('PolicyModal', { policy: 'acceptableuse' })
+                    )
+                  }
+                >
+                  Acceptable Use Policy
+                </span>
+              </div>
             </Footer>
           </LeftSide>
           <Background transitionState={transitionState}>
