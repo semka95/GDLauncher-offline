@@ -418,11 +418,10 @@ export function login(
       } else {
         data = {
           selectedProfile: {
-            id: 'ff64ff64ff64ff64ff64ff64ff64ff64',
+            id: '00000000000000000000000000000000',
             name: username
           },
-          accountType: ACCOUNT_MOJANG,
-          skin: `https://www.minecraftskins.com/uploads/skins/2021/03/27/bird-17274516.png?v375`
+          accountType: ACCOUNT_MOJANG
         };
       }
       dispatch(updateAccount(data.selectedProfile.id, data));

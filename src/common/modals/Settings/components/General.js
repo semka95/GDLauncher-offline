@@ -16,7 +16,8 @@ import {
   faNewspaper,
   faFolder,
   faFire,
-  faAd
+  faAd,
+  faSort
 } from '@fortawesome/free-solid-svg-icons';
 import { Select, Tooltip, Button, Switch, Input, Checkbox } from 'antd';
 import { faDiscord } from '@fortawesome/free-brands-svg-icons';
@@ -131,6 +132,10 @@ const CustomDataPathContainer = styled.div`
     z-index: 1;
     text-align: left;
   }
+`;
+
+const Hr = styled.div`
+  height: 35px;
 `;
 
 function copy(setCopied, copyText) {
@@ -437,7 +442,7 @@ const General = () => {
           }}
           checked={DiscordRPC}
         />
-      </DiscordRpc>
+      </Content>
       <Hr />
       <Title
         css={`
@@ -446,7 +451,7 @@ const General = () => {
       >
         Hide ADs &nbsp; <FontAwesomeIcon icon={faAd} />
       </Title>
-      <DiscordRpc>
+      <Content>
         <p
           css={`
             width: 350px;
@@ -460,7 +465,7 @@ const General = () => {
           }}
           checked={HideAds}
         />
-      </DiscordRpc>
+      </Content>
       <Hr />
       <Title
         css={`
