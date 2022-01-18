@@ -19,8 +19,6 @@ import {
   isNewVersionAvailable
 } from '../../../common/reducers/actions';
 import BisectHosting from '../../../ui/BisectHosting';
-import Logo from '../../../ui/Logo';
-import ga from '../../../common/utils/analytics';
 
 const SystemNavbar = () => {
   const dispatch = useDispatch();
